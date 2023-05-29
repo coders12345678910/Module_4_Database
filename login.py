@@ -1,6 +1,9 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 from flask_mysqldb import MySQL
 import MySQLdb.cursors
+from flask_bcrypt import Bcrypt
+bcrypt = Bcrypt()
+hashpwd = bcrypt.generate_password_hash('password')
 import re
 
 app = Flask(__name__)
@@ -29,12 +32,13 @@ def login():
         password = request.form['password']
 
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('SELECT * FROM accounts WHERE username = %s AND password = %s', (username,
-                                                                                        password,))
+        cursor.execute('SELECT * FROM accounts WHERE username = %s', (username,))
         # Fetch one record and return result
         account = cursor.fetchone()
+        user_hashpwd = account['password']
 
-        if account:
+        if account and bcrypt.check_password_hash(user_hashpwd, password):
+
             session['loggedin'] = True
             session['id'] = account['id']
             session['username'] = account['username']
@@ -45,6 +49,7 @@ def login():
             msg = 'Incorrect username/password!'
 
     return render_template('index.html', msg='')
+
 
 @app.route('/MyWebApp/register', methods=['GET', 'POST'])
 def register():
@@ -57,8 +62,9 @@ def register():
         password = request.form['password']
         email = request.form['email']
 
+        hashpwd = bcrypt.generate_password_hash(password)
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('INSERT INTO accounts VALUES (NULL, %s, %s, %s)', (username, password, email,))
+        cursor.execute('INSERT INTO accounts VALUES (NULL, %s, %s, %s)', (username, hashpwd, email,))
         mysql.connection.commit()
         msg = 'You have successfully registered!'
 
